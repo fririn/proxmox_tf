@@ -7,64 +7,116 @@ terraform {
   }
 }
 
+# provider "proxmox" {
+#   password = "Oshmkufa-2010-proxmox"
+#   username = "root@pam"
+#   ssh {
+#     agent       = true
+#     private_key = file("/home/paul/.ssh/id_rsa")
+#     username    = "root"
+#   }
+# }
+
 provider "proxmox" {
-  # endpoint = "http://10.0.128.4:8006"
-  # using variables from .env for setting up the provider
+  endpoint = var.proxmox_api_url
   ssh {
     agent = false
-    #private_key = file("~/.ssh/id_rsa")
-    node {
-      name = "hv02"
-      address = "10.0.128.4"
   }
 }
 
-# resource "proxmox_vm_qemu" "k8s_master" {
-#   target_node = "hv02"
-#   count       = var.cluster.master_count
-#   name        = "master-${count.index + 1}"
-#   vmid        = "60${count.index}"
-#
-#   os_type    = "cloud-init"
-#   clone      = var.cluster.os_image
-#   full_clone = true
-#
-#   ipconfig0 = "[gw=10.0.128.1,ip=10.0.128.6${count.index}/24]"
-#
-#   cores  = var.cluster.master_cpu
-#   memory = var.cluster.master_ram
-#   agent  = 1
-#
-#   tags = "k8s,terraform"
-# }
-#
-# resource "proxmox_vm_qemu" "k8s_worker" {
-#   target_node = "hv02"
-#   count       = var.cluster.worker_count
-#   name        = "worker-${count.index + 1}"
-#   vmid        = "61${count.index}"
-#
-#   os_type    = "cloud-init"
-#   clone      = var.cluster.os_image
-#   full_clone = true
-#
-#   cores  = var.cluster.worker_cpu
-#   memory = var.cluster.worker_ram
-#   agent  = 1
-#
-#   ipconfig0 = "[gw=10.0.128.1,ip=10.0.128.7${count.index}/24]"
-#   tags      = "k8s,terraform"
-#
-#   # Network
-#   # network {
-#   #   model  = "virtio"
-#   #   bridge = "vmbr0"
-#   # }
-#
-#   # Disk
-#   # disk {
-#   #   type    = "scsi"
-#   #   storage = "local-lvm"
-#   #   size    = "8G"
-#   # }
-# }
+
+
+
+resource "proxmox_virtual_environment_vm" "master" {
+  count       = var.master_count
+  name        = "k8s-master-${count.index}"
+  description = "Kubernetes master node ${count.index}"
+  node_name   = var.proxmox_node
+  tags        = ["k8s", "terraform", "master"]
+
+  # Clone from template
+  clone {
+    vm_id = proxmox_virtual_environment_vm.k8s_template.id
+    full  = true
+  }
+
+  # Hardware specs
+  cpu {
+    cores = var.master_cpu
+    type  = "host"
+  }
+  memory {
+    dedicated = var.master_memory
+  }
+
+  disk {
+    datastore_id = var.template_storage
+    interface    = "scsi0"
+    size         = var.master_disk_size
+  }
+
+  # Static IP configuration
+  initialization {
+    datastore_id = var.template_storage
+
+    user_account {
+      username = "ubuntu"
+      keys     = [var.ssh_public_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+    }
+  }
+  depends_on = [proxmox_virtual_environment_vm.k8s_template]
+}
+
+resource "proxmox_virtual_environment_vm" "worker" {
+  count       = var.worker_count
+  name        = "k8s-worker-${count.index}"
+  description = "Kubernetes worker node ${count.index}"
+  node_name   = var.proxmox_node
+  tags        = ["k8s", "terraform", "worker"]
+
+  # Clone from template
+  clone {
+    vm_id = proxmox_virtual_environment_vm.k8s_template.id
+    full  = true
+  }
+
+  # Hardware specs
+  cpu {
+    cores = var.worker_cpu
+    type  = "host"
+  }
+
+  memory {
+    dedicated = var.worker_memory
+  }
+
+  disk {
+    datastore_id = var.template_storage
+    interface    = "scsi0"
+    size         = var.worker_disk_size
+  }
+
+  # Static IP configuration
+  initialization {
+    datastore_id = var.template_storage
+
+    user_account {
+      username = "ubuntu"
+      keys     = [var.ssh_public_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+    }
+  }
+  depends_on = [proxmox_virtual_environment_vm.k8s_template]
+}
+
