@@ -37,6 +37,24 @@ variable "template_name" {
   default     = "ubuntu-cloud-template"
 }
 
+variable "template_id" {
+  description = "Id of the k8s template"
+  type        = string
+  default     = "5000"
+}
+
+variable "base_worker_vm_id" {
+  description = "Base VM id in Proxmox"
+  type        = string
+  default     = "5010"
+}
+
+variable "base_master_vm_id" {
+  description = "Base VM id in Proxmox"
+  type        = string
+  default     = "5020"
+}
+
 variable "template_storage" {
   description = "Storage location for template"
   type        = string

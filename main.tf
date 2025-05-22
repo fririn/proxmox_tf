@@ -33,6 +33,7 @@ resource "proxmox_virtual_environment_vm" "master" {
   description = "Kubernetes master node ${count.index}"
   node_name   = var.proxmox_node
   tags        = ["k8s", "terraform", "master"]
+  vm_id       = var.base_master_vm_id + count.index
 
   # Clone from template
   clone {
@@ -70,6 +71,9 @@ resource "proxmox_virtual_environment_vm" "master" {
       }
     }
   }
+  operating_system {
+    type = "l26"
+  }
   depends_on = [proxmox_virtual_environment_vm.k8s_template]
 }
 
@@ -79,6 +83,7 @@ resource "proxmox_virtual_environment_vm" "worker" {
   description = "Kubernetes worker node ${count.index}"
   node_name   = var.proxmox_node
   tags        = ["k8s", "terraform", "worker"]
+  vm_id       = var.base_worker_vm_id + count.index
 
   # Clone from template
   clone {

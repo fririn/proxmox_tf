@@ -1,8 +1,3 @@
-data "local_file" "ssh_public_key" {
-  filename = "/home/paul/.ssh/id_rsa.pub"
-}
-
-
 resource "proxmox_virtual_environment_vm" "k8s_template" {
   name        = "k8s-template"
   node_name   = var.proxmox_node
@@ -23,7 +18,8 @@ resource "proxmox_virtual_environment_vm" "k8s_template" {
   }
 
   agent {
-    enabled = false
+    enabled = true
+    trim    = true
   }
 
   disk {
@@ -41,6 +37,7 @@ resource "proxmox_virtual_environment_vm" "k8s_template" {
 
   initialization {
     datastore_id = var.template_storage
+
     user_account {
       username = "adm"
       password = "adm"
@@ -52,9 +49,34 @@ resource "proxmox_virtual_environment_vm" "k8s_template" {
         address = "dhcp"
       }
     }
+    user_data_file_id = proxmox_virtual_environment_file.k8s_template_snippet.id
   }
+
   depends_on = [proxmox_virtual_environment_download_file.ubuntu2404_cloud_image]
 }
+
+resource "proxmox_virtual_environment_file" "k8s_template_snippet" {
+  content_type = "snippets"
+  datastore_id = var.image_storage
+  node_name    = var.proxmox_node
+
+  source_raw {
+    file_name = "template-cloud-init.yaml"
+    data      = <<EOF
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - qemu-guest-agent
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+EOF
+  }
+}
+
+
+
 
 resource "proxmox_virtual_environment_download_file" "ubuntu2404_cloud_image" {
   content_type = "iso"
