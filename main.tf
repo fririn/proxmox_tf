@@ -125,3 +125,33 @@ resource "proxmox_virtual_environment_vm" "worker" {
   depends_on = [proxmox_virtual_environment_vm.k8s_template]
 }
 
+
+
+
+# Outputs
+output "k8s_master_details" {
+  description = "Details of Kubernetes master nodes"
+  value = [
+    for vm in proxmox_virtual_environment_vm.master : {
+      name  = vm.name
+      vm_id = vm.vm_id
+      ip    = vm.ipv4_addresses[1][0]
+    }
+  ]
+}
+
+output "k8s_worker_details" {
+  description = "Details of Kubernetes worker nodes"
+  value = [
+    for vm in proxmox_virtual_environment_vm.worker : {
+      name  = vm.name
+      vm_id = vm.vm_id
+      ip    = vm.ipv4_addresses[1][0]
+    }
+  ]
+}
+
+output "ansible_command" {
+  description = "Command to run Ansible playbook"
+  value       = "cd ansible && ansible-playbook -i inventory.ini site.yml"
+}
