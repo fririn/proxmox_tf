@@ -4,7 +4,7 @@ resource "proxmox_virtual_environment_vm" "k8s_template" {
   description = "this shit is hard smh"
 
   tags     = ["template", "terraform", "k8s"]
-  vm_id    = 5000
+  vm_id    = var.template_id
   template = true
   started  = false
 
