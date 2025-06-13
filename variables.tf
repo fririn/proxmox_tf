@@ -1,31 +1,3 @@
-variable "proxmox_api_url" {
-  description = "The Proxmox API URL"
-  type        = string
-}
-
-variable "proxmox_username" {
-  description = "Proxmox API username"
-  type        = string
-}
-
-variable "proxmox_password" {
-  description = "Proxmox API password"
-  type        = string
-  sensitive   = true
-}
-
-variable "proxmox_insecure" {
-  description = "Skip TLS verification"
-  type        = bool
-  default     = true
-}
-
-variable "proxmox_ssh_user" {
-  description = "SSH username for Proxmox host"
-  type        = string
-  default     = "root"
-}
-
 variable "proxmox_node" {
   description = "The Proxmox node to deploy VMs on"
   type        = string
@@ -67,14 +39,29 @@ variable "image_storage" {
   default     = "local"
 }
 
-variable "ubuntu_cloud_image_url" {
+variable "cloud_image_url" {
   description = "URL for Ubuntu Cloud Image"
   type        = string
   default     = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
 }
 
-variable "ssh_public_key" {
+variable "vm_ssh_key" {
   description = "SSH public key for VM access"
+  type        = string
+}
+
+variable "ssh_private_key_file" {
+  description = "Private key file location"
+  type        = string
+}
+
+variable "vm_ssh_user" {
+  description = "User for vms"
+  type        = string
+}
+
+variable "vm_ssh_password" {
+  description = "password for vms"
   type        = string
 }
 
@@ -134,12 +121,5 @@ variable "worker_disk_size" {
 
 # Local variables
 locals {
-  vm_defaults = {
-    clone    = var.template_name
-    os_type  = "cloud-init"
-    agent    = 1
-    bootdisk = "scsi0"
-    scsihw   = "virtio-scsi-pci"
-  }
 }
 

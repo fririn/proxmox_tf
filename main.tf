@@ -7,24 +7,11 @@ terraform {
   }
 }
 
-# provider "proxmox" {
-#   password = "Oshmkufa-2010-proxmox"
-#   username = "root@pam"
-#   ssh {
-#     agent       = true
-#     private_key = file("/home/paul/.ssh/id_rsa")
-#     username    = "root"
-#   }
-# }
-
 provider "proxmox" {
-  endpoint = var.proxmox_api_url
   ssh {
     agent = false
   }
 }
-
-
 
 
 resource "proxmox_virtual_environment_vm" "master" {
@@ -56,24 +43,6 @@ resource "proxmox_virtual_environment_vm" "master" {
     size         = var.master_disk_size
   }
 
-  # Static IP configuration
-  initialization {
-    datastore_id = var.template_storage
-
-    user_account {
-      username = "ubuntu"
-      keys     = [var.ssh_public_key]
-    }
-
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-    }
-  }
-  operating_system {
-    type = "l26"
-  }
   depends_on = [proxmox_virtual_environment_vm.k8s_template]
 }
 
@@ -107,21 +76,6 @@ resource "proxmox_virtual_environment_vm" "worker" {
     size         = var.worker_disk_size
   }
 
-  # Static IP configuration
-  initialization {
-    datastore_id = var.template_storage
-
-    user_account {
-      username = "ubuntu"
-      keys     = [var.ssh_public_key]
-    }
-
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-    }
-  }
   depends_on = [proxmox_virtual_environment_vm.k8s_template]
 }
 
