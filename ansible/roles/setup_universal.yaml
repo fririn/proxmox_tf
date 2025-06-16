@@ -1,0 +1,160 @@
+- name: Universal k8s node setup
+  hosts: k8s_cluster
+  become: yes
+  vars:
+    k8s_version: "1.33"
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 600
+
+    - name: Install prerequisits
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - socat
+          - conntrack
+        state: present
+
+#############################################################
+    - name: Disable swap immediately
+      shell: swapoff -a
+
+    - name: Remove swap entries from fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '.*swap.*'
+        state: absent
+
+#############################################################
+    - name: Load required kernel modules
+      modprobe:
+        name: "{{ item }}"
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Make kernel modules persistent
+      copy:
+        content: |
+          overlay
+          br_netfilter
+        dest: /etc/modules-load.d/k8s.conf
+
+    - name: Set required sysctl parameters
+      copy:
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+        dest: /etc/sysctl.d/k8s.conf
+
+    - name: Apply sysctl parameters
+      shell: sysctl --system
+
+#############################################################
+    - name: Install containerd
+      apt:
+        name:
+          - containerd
+        state: present
+
+    - name: Create containerd configuration directory
+      file:
+        path: /etc/containerd
+        state: directory
+
+    - name: Generate containerd configuration
+      shell: containerd config default > /etc/containerd/config.toml
+
+    - name: Configure containerd to use systemd cgroup driver
+      lineinfile:
+        path: /etc/containerd/config.toml
+        regexp: '^\s*SystemdCgroup = false'
+        line: 'SystemdCgroup = true'
+        backrefs: yes
+
+    - name: Start and enable containerd
+      systemd:
+        name: containerd
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+
+    - name: Ensure containerd is fully ready
+      shell: |
+        containerd config dump > /dev/null 2>&1
+        test -S /run/containerd/containerd.sock
+      register: containerd_ready
+      until: containerd_ready.rc == 0
+      retries: 10
+      delay: 5
+#############################################################
+    - name: Add Kubernetes GPG key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/ /"
+        state: present
+
+    - name: Update apt cache after adding K8s repo
+      apt:
+        update_cache: yes
+
+    - name: Install Kubernetes packages
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        allow_downgrade: yes
+
+    - name: Hold Kubernetes packages to prevent upgrades
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+#############################################################
+    # - name: Configure kubelet to use containerd
+    #   copy:
+    #     content: |
+    #       KUBELET_EXTRA_ARGS=--container-runtime-endpoint=unix:///run/containerd/containerd.sock
+    #     dest: /etc/default/kubelet
+
+    - name: Enable and start kubelet
+      systemd:
+        name: kubelet
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Create /etc/crictl.yaml for crictl configuration
+      copy:
+        content: |
+          runtime-endpoint: unix:///run/containerd/containerd.sock
+          image-endpoint: unix:///run/containerd/containerd.sock
+          timeout: 2
+          debug: false
+          pull-image-on-create: false
+        dest: /etc/crictl.yaml
+
+    - name: Add ansible user to necessary groups
+      user:
+        name: "{{ ansible_user }}"
+        groups: systemd-journal
+        append: yes

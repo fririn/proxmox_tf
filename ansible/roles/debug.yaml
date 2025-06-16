@@ -1,0 +1,10 @@
+- name: Print all variables and pause
+  hosts: all
+  tasks:
+    - name: Display all variables for current host
+      debug:
+        var: hostvars[inventory_hostname]
+
+    # - name: Wait 3 seconds before continuing
+    #   pause:
+    #     seconds: 3
